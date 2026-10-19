@@ -9,6 +9,7 @@
 /target/
 
 *_minified*
+minified_*
 
 /resources/**/*.rs
 
