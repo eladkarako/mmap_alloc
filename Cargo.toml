@@ -1,7 +1,7 @@
 [package]
 authors = ["Elad Karako <eladkarako@gmail.com>"]
 categories = ["api-bindings", "os::windows-apis"]
-description = "Tiny crate to allow very fast write to disk using mmap and pre-allocation."
+description = "file pre-allocation to memory file (optional parallel)"
 documentation = "https://docs.rs/mmap_alloc"
 edition = "2024"
 include = ["src/**/*.rs", "README.md", "LICENSE.MIT"]
@@ -11,20 +11,19 @@ name = "mmap_alloc"
 readme = "README.md"
 repository = "https://github.com/eladkarako/mmap_alloc"
 rust-version = "1.93.0"
-version = "26.10.15"
+version = "26.10.19"
 
 [dependencies]
 anyhow = { version = "1.0.104" }
-winapi = {version = "0.3.9"}
+libc = { version = "0.2" }
+winapi = { version = "0.3.9", default-features = false, features = ["fileapi", "memoryapi", "handleapi", "winnt"] }
 
 [dev-dependencies]
-tempfile = "3.0"
+tempfile = { version = "3.0" }
 
 [features]
 default = []
 multithreaded = []
-
-
 
 [profile.release]
 codegen-units = 1                                                   # Single unit for better optimization and smaller binary size
@@ -42,4 +41,4 @@ name = "mmap_alloc"
 path = "src/lib.rs"
 
 [lints.rust]
-missing_docs = "warn"
+missing_docs = "allow"
