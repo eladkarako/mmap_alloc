@@ -27,12 +27,18 @@ fn main() -> anyhow::Result<()> {
     // Perform parallel writes: fill first half with 'A' and second half with 'B'
     mmap.write_parallel(
         |first_half| {
-            println!("  [Thread 1] Writing to first half ({} bytes)...", first_half.len());
+            println!(
+                "  [Thread 1] Writing to first half ({} bytes)...",
+                first_half.len()
+            );
             first_half.fill(b'A');
             Ok(())
         },
         |second_half| {
-            println!("  [Thread 2] Writing to second half ({} bytes)...", second_half.len());
+            println!(
+                "  [Thread 2] Writing to second half ({} bytes)...",
+                second_half.len()
+            );
             second_half.fill(b'B');
             Ok(())
         },
@@ -51,7 +57,9 @@ fn main() -> anyhow::Result<()> {
     let second_ok = data[midpoint..].iter().all(|&b| b == b'B');
 
     if first_ok && second_ok {
-        println!("✓ Verification passed: file contains expected pattern");
+        println!(
+            "✓ Verification passed: file contains expected pattern"
+        );
     } else {
         println!("✗ Verification failed: unexpected data pattern");
     }
@@ -63,6 +71,8 @@ fn main() -> anyhow::Result<()> {
 #[cfg(not(feature = "multithreaded"))]
 fn main() {
     eprintln!("This example requires the 'multithreaded' feature.");
-    eprintln!("Run with: cargo run --example parallel_write --features multithreaded");
+    eprintln!(
+        "Run with: cargo run --example parallel_write --features multithreaded"
+    );
     std::process::exit(1);
 }

@@ -9,7 +9,10 @@ fn main() -> anyhow::Result<()> {
     let file_path = "output_large.bin";
     let file_size: u64 = 10 * 1024 * 1024; // 10 MB
 
-    println!("Creating a {} MB memory-mapped file...", file_size / (1024 * 1024));
+    println!(
+        "Creating a {} MB memory-mapped file...",
+        file_size / (1024 * 1024)
+    );
     let mmap = AllocMmap::create(file_path, file_size)?;
 
     println!("✓ File created and pre-allocated");
@@ -23,13 +26,21 @@ fn main() -> anyhow::Result<()> {
     println!("\nWriting pattern data...");
     for (chunk_idx, window) in slice.chunks(chunk_size).enumerate() {
         if chunk_idx % 256 == 0 {
-            println!("  Processed {} KB...", (chunk_idx * chunk_size) / 1024);
+            println!(
+                "  Processed {} KB...",
+                (chunk_idx * chunk_size) / 1024
+            );
         }
 
-        // Write pattern: cycle through bytes
+        // Write pattern: cycle through bytes - UNSAFE: Cast const pointer to mutable and create proper slice
         unsafe {
             let mutable_ptr = window.as_ptr() as *mut u8;
-            for (i, byte) in (*mutable_ptr as *mut [u8])[..window.len()].iter_mut().enumerate() {
+            let mutable_slice = std::slice::from_raw_parts_mut(
+                mutable_ptr,
+                window.len(),
+            );
+
+            for (i, byte) in mutable_slice.iter_mut().enumerate() {
                 *byte = ((chunk_idx + i) % 256) as u8;
             }
         }
@@ -43,7 +54,10 @@ fn main() -> anyhow::Result<()> {
 
     // Verify file was created
     let file_size_on_disk = std::fs::metadata(file_path)?.len();
-    println!("\n✓ File size on disk: {} MB", file_size_on_disk / (1024 * 1024));
+    println!(
+        "\n✓ File size on disk: {} MB",
+        file_size_on_disk / (1024 * 1024)
+    );
 
     std::fs::remove_file(file_path).ok();
     Ok(())
