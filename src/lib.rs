@@ -1,4 +1,3 @@
-// C:\Users\Elad\RustroverProjects\mmap_alloc\src\lib.rs
 pub mod mmap;
 #[cfg(unix)]
 mod unix;
@@ -30,6 +29,12 @@ impl AllocMmap {
         let mmap = initialize_and_map_file(&file, size)?;
         Ok(AllocMmap { mmap: Arc::new(mmap), size: size as usize })
     }
+    pub fn builder<P: AsRef<Path>>(
+        path: P,
+        size: u64,
+    ) -> AllocMmapBuilder<P> {
+        AllocMmapBuilder { path, size, partitions: None }
+    }
     pub fn as_slice(&self) -> &[u8] {
         &*self.mmap
     }
@@ -39,6 +44,22 @@ impl AllocMmap {
     pub fn flush(&self) -> Result<()> {
         self.mmap.flush()
     }
+    pub fn write_bytes(
+        &self,
+        data: &[u8],
+    ) -> Result<()> {
+        self.execute_partitioned(None, |_, chunk| {
+            let offset = chunk.as_ptr() as usize
+                - self.mmap.as_ptr() as usize;
+            let len =
+                chunk.len().min(data.len().saturating_sub(offset));
+            if len > 0 {
+                chunk[..len]
+                    .copy_from_slice(&data[offset..offset + len]);
+            }
+            Ok(())
+        })
+    }
     pub fn write_parallel<F>(
         &self,
         partition_fn: F,
@@ -46,9 +67,19 @@ impl AllocMmap {
     where
         F: Fn(usize, &mut [u8]) -> Result<()> + Send + Sync,
     {
-        self.write_parallel_with_partitions(None, partition_fn)
+        self.execute_partitioned(None, partition_fn)
     }
     pub fn write_parallel_with_partitions<F>(
+        &self,
+        partition_count: Option<usize>,
+        partition_fn: F,
+    ) -> Result<()>
+    where
+        F: Fn(usize, &mut [u8]) -> Result<()> + Send + Sync,
+    {
+        self.execute_partitioned(partition_count, partition_fn)
+    }
+    fn execute_partitioned<F>(
         &self,
         partition_count: Option<usize>,
         partition_fn: F,
@@ -89,6 +120,31 @@ impl AllocMmap {
             }
             Ok(())
         })
+    }
+}
+pub struct AllocMmapBuilder<P: AsRef<Path>> {
+    path: P,
+    size: u64,
+    partitions: Option<usize>,
+}
+impl<P: AsRef<Path>> AllocMmapBuilder<P> {
+    pub fn with_partitions(
+        mut self,
+        count: usize,
+    ) -> Self {
+        self.partitions = Some(count);
+        self
+    }
+    pub fn build(self) -> Result<AllocMmap> {
+        AllocMmap::create(self.path, self.size)
+    }
+    pub fn build_and_write_bytes(
+        self,
+        data: &[u8],
+    ) -> Result<AllocMmap> {
+        let mmap = self.build()?;
+        mmap.write_bytes(data)?;
+        Ok(mmap)
     }
 }
 fn validate_allocation_size(size: u64) -> Result<()> {

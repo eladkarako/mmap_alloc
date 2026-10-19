@@ -9,31 +9,17 @@ you may specify you explicit amount of desired parallel write threads.
 <hr/>
 
 ### examples
+- example_1_simple_bytes
+- example_2_builder_bytes
+- example_3_builder_partitions_bytes
+- example_4_create_parallel
+- example_5_builder_parallel
+- example_6_builder_custom_partitions_parallel
+- example_7_combined_mixed_writes
+- example_8_builder_mixed
 
-```txt
-mmap_alloc/
-├── examples/
-│   ├── example_write.rs
-│   └── example_large_file.rs
-├── src/
-├── Cargo.toml
-└── ...
-```
-
-1. Basic Write Example - `cargo run --example  example_write`
-2. Large File Example - `cargo run --example  example_large_file`
-
-with (optionally):  
-`--target x86_64-pc-windows-msvc`  
-`--target x86_64-unknown-linux-gnu`  
-
-These examples showcase the crate's key features:  
-- pre-allocation efficiency.
-- simple synchronous writes.
-- parallel writes with the optional feature.
-- async flushing.
-
-Each includes a little bit of a rustdocs as well.
+you can test those like this: `cargo run --example  example_1_simple_bytes`  
+optionally adding `--target x86_64-pc-windows-msvc` or `--target x86_64-unknown-linux-gnu` (use the toolchains you have).
 
 <hr/>
 

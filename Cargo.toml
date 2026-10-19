@@ -32,14 +32,36 @@ panic = "abort"
 rpath = false
 strip = true
 [[example]]
-name = "example_write"
-path = "examples/example_write.rs"
+name = "example_1_simple_bytes"
+path = "examples/example_1_simple_bytes.rs"
+
 [[example]]
-name = "example_large_file"
-path = "examples/example_large_file.rs"
+name = "example_2_builder_bytes"
+path = "examples/example_2_builder_bytes.rs"
+
 [[example]]
-name = "example_custom_partitions"
-path = "examples/example_custom_partitions.rs"
+name = "example_3_builder_partitions_bytes"
+path = "examples/example_3_builder_partitions_bytes.rs"
+
+[[example]]
+name = "example_4_create_parallel"
+path = "examples/example_4_create_parallel.rs"
+
+[[example]]
+name = "example_5_builder_parallel"
+path = "examples/example_5_builder_parallel.rs"
+
+[[example]]
+name = "example_6_builder_custom_partitions_parallel"
+path = "examples/example_6_builder_custom_partitions_parallel.rs"
+
+[[example]]
+name = "example_7_combined_mixed_writes"
+path = "examples/example_7_combined_mixed_writes.rs"
+
+[[example]]
+name = "example_8_builder_mixed"
+path = "examples/example_8_builder_mixed.rs"
 [lib]
 name = "mmap_alloc"
 path = "src/lib.rs"
