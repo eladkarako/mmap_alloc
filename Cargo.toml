@@ -1,7 +1,7 @@
 [package]
 authors = ["Elad Karako <eladkarako@gmail.com>"]
 categories = ["api-bindings", "os::windows-apis"]
-description = "file pre-allocation to memory file (optional parallel)"
+description = "tiny, fast and safe file writer crate, that parallel writes to a pre-allocated memory-mapped file."
 documentation = "https://docs.rs/mmap_alloc"
 edition = "2024"
 include = ["src/**/*.rs", "README.md", "LICENSE.MIT"]
