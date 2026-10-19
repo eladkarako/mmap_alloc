@@ -1,5 +1,6 @@
 use crate::mmap::MmapMut;
-use anyhow::{bail, Context};
+#[allow(unused_imports)]
+use anyhow::{bail, Context, Result};
 use std::{fs::File, os::unix::io::AsRawFd};
 
 pub fn allocate_file(
