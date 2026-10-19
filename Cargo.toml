@@ -35,6 +35,18 @@ panic = "abort"                                                     # Replace un
 rpath = false                                                       # Don't embed runtime library search paths
 strip = true                                                        # Strip all symbols from final binary
 
+[[example]]
+name = "example_basic_write"
+path = "examples/example_basic_write.rs"
+
+[[example]]
+name = "example_parallel_write"
+path = "examples/example_parallel_write.rs"
+required-features = ["multithreaded"]
+
+[[example]]
+name = "example_large_file"
+path = "examples/example_large_file.rs"
 
 [lib]
 name = "mmap_alloc"
