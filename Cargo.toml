@@ -1,0 +1,45 @@
+[package]
+authors = ["Elad Karako <eladkarako@gmail.com>"]
+categories = ["api-bindings", "os::windows-apis"]
+description = "Tiny crate to allow very fast write to disk using mmap and pre-allocation."
+documentation = "https://docs.rs/mmap_alloc"
+edition = "2024"
+include = ["src/**/*.rs", "README.md", "LICENSE.MIT"]
+keywords = ["windows", "linux", "disk", "mmap", "allocate"]
+license = "MIT"
+name = "mmap_alloc"
+readme = "README.md"
+repository = "https://github.com/eladkarako/mmap_alloc"
+rust-version = "1.93.0"
+version = "26.10.15"
+
+[dependencies]
+anyhow = { version = "1.0.104" }
+winapi = {version = "0.3.9"}
+
+[dev-dependencies]
+tempfile = "3.0"
+
+[features]
+default = []
+multithreaded = []
+
+
+
+[profile.release]
+codegen-units = 1                                                   # Single unit for better optimization and smaller binary size
+debug = false                                                       # Strip debug symbols for smaller binary
+incremental = false                                                 # Disable incremental compilation for cleaner builds
+lto = true                                                          # Link-time optimization for better performance
+opt-level = 2                                                       # prioritizes speed (loop unrolling, better branch prediction, instruction cache fit) over binary size.
+panic = "abort"                                                     # Replace unwinding with abort (smaller binary, faster panics)
+rpath = false                                                       # Don't embed runtime library search paths
+strip = true                                                        # Strip all symbols from final binary
+
+
+[lib]
+name = "mmap_alloc"
+path = "src/lib.rs"
+
+[lints.rust]
+missing_docs = "warn"
