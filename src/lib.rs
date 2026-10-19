@@ -1,28 +1,22 @@
+// C:\Users\Elad\RustroverProjects\mmap_alloc\src\lib.rs
 pub mod mmap;
-
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]
 use unix as os;
-
 #[cfg(windows)]
 mod windows;
-#[cfg(windows)]
-use windows as os;
-
 use anyhow::{bail, Context, Result};
 pub use mmap::MmapMut;
-use std::{
-    fs::{File, OpenOptions},
-    path::Path,
-    sync::Arc,
-};
-
+use std::fs::{File, OpenOptions};
+use std::path::Path;
+use std::sync::Arc;
+#[cfg(windows)]
+use windows as os;
 pub struct AllocMmap {
     mmap: Arc<MmapMut>,
     size: usize,
 }
-
 impl AllocMmap {
     pub fn create<P: AsRef<Path>>(
         path: P,
@@ -36,48 +30,73 @@ impl AllocMmap {
         let mmap = initialize_and_map_file(&file, size)?;
         Ok(AllocMmap { mmap: Arc::new(mmap), size: size as usize })
     }
-
     pub fn as_slice(&self) -> &[u8] {
         &*self.mmap
     }
-
     pub fn size(&self) -> usize {
         self.size
     }
-
     pub fn flush(&self) -> Result<()> {
-        self.mmap.flush_sync()
+        self.mmap.flush()
     }
-
-    pub fn flush_async(&self) -> Result<()> {
-        self.mmap.flush_async()
-    }
-
-    #[cfg(feature = "multithreaded")]
-    pub fn write_parallel<F1, F2>(
+    pub fn write_parallel<F>(
         &self,
-        f1: F1,
-        f2: F2,
+        partition_fn: F,
     ) -> Result<()>
     where
-        F1: FnOnce(&mut [u8]) -> Result<()> + Send + 'static,
-        F2: FnOnce(&mut [u8]) -> Result<()> + Send + 'static,
+        F: Fn(usize, &mut [u8]) -> Result<()> + Send + Sync,
     {
-        validate_file_size_for_parallel_writes(self.size)?;
-        let (handle1, handle2) = spawn_parallel_write_threads(
-            &self.mmap, self.size, f1, f2,
-        )?;
-        wait_for_parallel_write_completion(handle1, handle2)
+        self.write_parallel_with_partitions(None, partition_fn)
+    }
+    pub fn write_parallel_with_partitions<F>(
+        &self,
+        partition_count: Option<usize>,
+        partition_fn: F,
+    ) -> Result<()>
+    where
+        F: Fn(usize, &mut [u8]) -> Result<()> + Send + Sync,
+    {
+        let thread_count = partition_count.unwrap_or_else(|| {
+            (num_cpus::get()).saturating_sub(1).max(1)
+        });
+        let chunk_size =
+            (self.size + thread_count - 1) / thread_count;
+        let partition_fn = Arc::new(partition_fn);
+        std::thread::scope(|s| {
+            let results: Vec<_> = (0..thread_count)
+                .map(|i| {
+                    let start = i * chunk_size;
+                    let end = (start + chunk_size).min(self.size);
+                    let partition_fn = Arc::clone(&partition_fn);
+                    s.spawn(move || {
+                        let slice = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                self.mmap.as_ptr().add(start),
+                                end - start,
+                            )
+                        };
+                        partition_fn(i, slice)
+                    })
+                })
+                .collect();
+            for (i, result) in results.into_iter().enumerate() {
+                result
+                    .join()
+                    .map_err(|_| {
+                        anyhow::anyhow!("Thread {} panicked", i)
+                    })?
+                    .context(format!("Thread {} write failed", i))?;
+            }
+            Ok(())
+        })
     }
 }
-
 fn validate_allocation_size(size: u64) -> Result<()> {
     if size == 0 {
-        bail!("File size must be greater than 0");
+        bail!("File size must be greater than 0")
     }
     Ok(())
 }
-
 fn create_file_at_path<P: AsRef<Path>>(path: P) -> Result<File> {
     let path = path.as_ref();
     OpenOptions::new()
@@ -88,7 +107,6 @@ fn create_file_at_path<P: AsRef<Path>>(path: P) -> Result<File> {
         .open(path)
         .context(format!("Failed to create file at {:?}", path))
 }
-
 fn initialize_and_map_file(
     file: &File,
     size: u64,
@@ -99,110 +117,6 @@ fn initialize_and_map_file(
     zero_initialize_slice(slice);
     Ok(mmap)
 }
-
 fn zero_initialize_slice(slice: &mut [u8]) {
-    slice.fill(0);
-}
-
-#[cfg(feature = "multithreaded")]
-fn validate_file_size_for_parallel_writes(
-    size: usize
-) -> Result<()> {
-    const MINIMUM_PARALLEL_WRITE_SIZE: usize = 2;
-    if size < MINIMUM_PARALLEL_WRITE_SIZE {
-        bail!(
-            "File size too small for parallel writes (minimum {} bytes)",
-            MINIMUM_PARALLEL_WRITE_SIZE
-        );
-    }
-    Ok(())
-}
-
-#[cfg(feature = "multithreaded")]
-fn spawn_parallel_write_threads<F1, F2>(
-    mmap: &Arc<MmapMut>,
-    total_size: usize,
-    f1: F1,
-    f2: F2,
-) -> Result<(
-    std::thread::JoinHandle<Result<()>>,
-    std::thread::JoinHandle<Result<()>>,
-)>
-where
-    F1: FnOnce(&mut [u8]) -> Result<()> + Send + 'static,
-    F2: FnOnce(&mut [u8]) -> Result<()> + Send + 'static,
-{
-    use std::thread;
-
-    let midpoint = calculate_split_midpoint(total_size);
-    let mmap_clone1 = Arc::clone(mmap);
-    let mmap_clone2 = Arc::clone(mmap);
-
-    let handle1 = thread::spawn(move || {
-        let slice =
-            create_mutable_slice_from_start(&mmap_clone1, midpoint)?;
-        f1(slice)
-    });
-
-    let handle2 = thread::spawn(move || {
-        let slice = create_mutable_slice_from_offset(
-            &mmap_clone2,
-            midpoint,
-            total_size,
-        )?;
-        f2(slice)
-    });
-
-    Ok((handle1, handle2))
-}
-
-#[cfg(feature = "multithreaded")]
-fn calculate_split_midpoint(total_size: usize) -> usize {
-    total_size / 2
-}
-
-#[cfg(feature = "multithreaded")]
-fn create_mutable_slice_from_start(
-    mmap: &Arc<MmapMut>,
-    length: usize,
-) -> Result<&mut [u8]> {
-    let slice = unsafe {
-        std::slice::from_raw_parts_mut(mmap.as_ptr(), length)
-    };
-    Ok(slice)
-}
-
-#[cfg(feature = "multithreaded")]
-fn create_mutable_slice_from_offset(
-    mmap: &Arc<MmapMut>,
-    offset: usize,
-    remaining_length: usize,
-) -> Result<&mut [u8]> {
-    let slice = unsafe {
-        std::slice::from_raw_parts_mut(
-            mmap.as_ptr().add(offset),
-            remaining_length - offset,
-        )
-    };
-    Ok(slice)
-}
-
-#[cfg(feature = "multithreaded")]
-fn wait_for_parallel_write_completion(
-    handle1: std::thread::JoinHandle<Result<()>>,
-    handle2: std::thread::JoinHandle<Result<()>>,
-) -> Result<()> {
-    match (handle1.join(), handle2.join()) {
-        (Ok(result1), Ok(result2)) => {
-            result1.context("Thread 1 write failed")?;
-            result2.context("Thread 2 write failed")?;
-            Ok(())
-        }
-        (Err(_), _) => {
-            bail!("Thread 1 panicked during write_parallel")
-        }
-        (_, Err(_)) => {
-            bail!("Thread 2 panicked during write_parallel")
-        }
-    }
+    slice.fill(0)
 }
