@@ -1,9 +1,8 @@
-// C:\Users\Elad\RustroverProjects\mmap_alloc\src\windows\mod.rs
-#[cfg(windows)]
-use crate::mmap::MmapMut;
 use anyhow::{bail, Context, Result};
-use std::{fs::File, os::windows::io::AsRawHandle};
-pub fn allocate_file(
+use std::fs::File;
+use std::os::windows::io::AsRawHandle;
+
+pub fn allocate_file_impl(
     file: &File,
     file_size: u64,
 ) -> Result<()> {
@@ -17,6 +16,7 @@ pub fn allocate_file(
     if file_size > i64::MAX as u64 {
         bail!("Size exceeds i64::MAX")
     }
+
     let (high, low) = ((file_size >> 32) as u32, file_size as u32);
     let ret = unsafe {
         winapi::um::fileapi::SetFilePointer(
@@ -26,20 +26,20 @@ pub fn allocate_file(
             2,
         )
     };
+
     if ret == 0xFFFFFFFF {
         return Err(std::io::Error::last_os_error())
             .context("SetFilePointer failed");
     }
+
     let ret = unsafe { winapi::um::fileapi::SetEndOfFile(handle) };
     if ret == 0 {
         return Err(std::io::Error::last_os_error())
             .context("SetEndOfFile failed");
     }
+
     Ok(())
 }
-pub fn mmap_file(
-    file: &File,
-    size: usize,
-) -> Result<MmapMut> {
-    MmapMut::map_mut(file, size)
-}
+
+#[cfg(test)]
+mod tests;
